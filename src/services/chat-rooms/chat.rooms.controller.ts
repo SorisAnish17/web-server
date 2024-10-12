@@ -7,7 +7,7 @@ export class ChatRoomsController {
 
   @Post()
   async createOnlineActivity(
-    @Body() referenceInfo: { referenceNo: string; referenceType: string },
+    @Body() referenceInfo: { referenceId: string; referenceType: string },
   ) {
     return this.chatRoomsService.createChatRoom(referenceInfo);
   }

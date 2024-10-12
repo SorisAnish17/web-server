@@ -2,7 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { ChatRoomsCollection } from '../../../libs/database/collections/chat-rooms/chat-rooms';
 
 export const createChatRoom = (chatRoomsCollection: ChatRoomsCollection) => {
-  return async (referenceInfo: { referenceNo: string; referenceType }) => {
+  return async (referenceInfo: { referenceId: string; referenceType }) => {
     try {
       const message = await chatRoomsCollection.createChatRoom(referenceInfo);
 

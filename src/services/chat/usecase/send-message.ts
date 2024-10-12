@@ -3,9 +3,12 @@ import { ChatEventCollection } from '../../../libs/database/collections/chat-eve
 import { CreateChatMessageDto } from 'src/core/dto/chat-event';
 
 export const sendMessage = (chatRoomsCollection: ChatEventCollection) => {
-  return async (messageData: CreateChatMessageDto) => {
+  return async (messageData: CreateChatMessageDto, server: any) => {
     try {
-      const message = await chatRoomsCollection.sendMessage(messageData);
+      const message = await chatRoomsCollection.sendMessage(
+        messageData,
+        server,
+      );
 
       return { message: message };
     } catch (error) {

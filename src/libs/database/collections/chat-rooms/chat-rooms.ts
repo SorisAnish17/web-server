@@ -1,35 +1,44 @@
-import { Collection } from 'mongodb';
+import { Collection, ObjectId } from 'mongodb';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { dbCollectionNames } from '../../db-connections';
 import { DatabaseClientService } from '../../index.service';
+import { dbUtils } from '../../utils';
+
+interface ReferenceInfo {
+  referenceId: string;
+  referenceType: string;
+}
+
+interface Participant {
+  organisationId: string;
+  outletId?: string;
+  type: string;
+}
 
 @Injectable()
 export class ChatRoomsCollection {
   constructor(private readonly databaseClientService: DatabaseClientService) {}
 
   private async getCollection(): Promise<Collection> {
-    return await this.databaseClientService.getDBCollection(
+    return this.databaseClientService.getDBCollection(
       dbCollectionNames.chat_rooms,
     );
   }
 
-  private async SupportCollection(): Promise<Collection> {
-    return await this.databaseClientService.getDBCollection(
+  private async getSupportCollection(): Promise<Collection> {
+    return this.databaseClientService.getDBCollection(
       dbCollectionNames.support_tickets,
     );
   }
 
-  async createChatRoom(referenceInfo: {
-    referenceNo: string;
-    referenceType: string;
-  }) {
-    const { referenceNo, referenceType } = referenceInfo;
-    const participants = [];
+  async createChatRoom(referenceInfo: ReferenceInfo) {
+    const { referenceId, referenceType } = referenceInfo;
+    const participants: Participant[] = [];
+    const referenceObjectId = dbUtils.convertToObjectId(referenceId);
 
     try {
-      // Check for duplicate chat room
       const existingChatRoom = await this.findChatRoom(
-        referenceNo,
+        referenceObjectId,
         referenceType,
       );
       if (existingChatRoom) {
@@ -39,48 +48,43 @@ export class ChatRoomsCollection {
         );
       }
 
-      const ticketCollection = await this.SupportCollection();
+      const ticketCollection = await this.getSupportCollection();
       const filterTicket = await ticketCollection.findOne({
-        referenceNo,
+        _id: referenceObjectId,
       });
+
+      if (!filterTicket) {
+        throw new HttpException(
+          'Support ticket not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
 
       const { title, issueReporter, issueWithUser } = filterTicket;
 
+      participants.push({
+        organisationId: issueReporter.organisationId,
+        outletId: issueReporter.outletId,
+        type: issueReporter.type,
+      });
+
       if (title === 'order') {
         participants.push({
-          organisationId: issueReporter.organisationId,
-          ...(issueReporter.outletId !== undefined && {
-            outletId: issueReporter.outletId,
-          }),
-          type: issueReporter.type,
-        });
-        participants.push({
           organisationId: issueWithUser.organisationId,
-          ...(issueWithUser.outletId !== undefined && {
-            outletId: issueWithUser.outletId,
-          }),
+          outletId: issueWithUser.outletId,
           type: issueWithUser.type,
-        });
-      } else {
-        participants.push({
-          organisationId: issueReporter.organisationId,
-          ...(issueReporter.outletId !== undefined && {
-            outletId: issueReporter.outletId,
-          }),
-          type: issueReporter.type,
         });
       }
 
       const data = {
         referenceType,
         participants,
-        referenceNo,
+        referenceId: referenceObjectId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       const chatRoomCollection = await this.getCollection();
-
       await chatRoomCollection.insertOne(data);
 
       return 'Chat room created successfully';
@@ -89,10 +93,13 @@ export class ChatRoomsCollection {
     }
   }
 
-  private async findChatRoom(referenceNo: string, referenceType: string) {
+  private async findChatRoom(
+    referenceObjectId: ObjectId,
+    referenceType: string,
+  ) {
     const chatRoomCollection = await this.getCollection();
     return await chatRoomCollection.findOne({
-      referenceNo,
+      referenceId: referenceObjectId,
       referenceType,
     });
   }
