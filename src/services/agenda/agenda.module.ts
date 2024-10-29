@@ -1,10 +1,9 @@
 // agenda.module.ts
 import { Module } from '@nestjs/common';
-import { AgendaProvider } from './agenda.provider';
-import { EmailClientModule } from '../../libs/email-delivery-client/email-delivery.module';
+import { AgendaProvider } from './agenda.controller';
 
 @Module({
-  providers: [AgendaProvider, EmailClientModule],
-  exports: [AgendaProvider], // Ensure it's exported
+  providers: [AgendaProvider],
+  exports: [AgendaProvider],
 })
 export class AgendaModule {}

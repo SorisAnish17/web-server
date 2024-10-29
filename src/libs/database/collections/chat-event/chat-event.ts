@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { DatabaseClientService } from '../../index.service';
 import { Collection, ObjectId } from 'mongodb';
 import { dbCollectionNames } from '../../db-connections';
@@ -8,10 +8,9 @@ import {
 } from '../../../../core/dto/chat-event/index';
 import { dbUtils } from '../../utils';
 import { ScheduleUnreadMessagesCollection } from '../schedule-unread-messages/schedule-unread-messages';
-import { handleError } from '../../../../services/chat/usecase/handle-error';
 import { setScheduler } from '../../../../services/schedule-unread-messages/usecase/set-scheduler';
 import { removeUserFromScheduler } from '../../../../services/schedule-unread-messages/usecase/remove-user-from-scheduler';
-import { AgendaProvider } from '../../../../services/agenda/agenda.provider';
+import { AgendaProvider } from '../../../../services/agenda/agenda.controller';
 
 type CollectionNames = keyof typeof dbCollectionNames;
 
@@ -56,7 +55,12 @@ export class ChatEventCollection {
       if (result.insertedId) {
         // Schedule any additional tasks related to the message
 
-        await this.scheduler(messageData, result.insertedId);
+        await setScheduler(
+          messageData,
+          result.insertedId,
+          this.databaseClientService,
+          this.scheduleUnreadMessagesCollection,
+        );
 
         // Return the message data with insertedId
         return {
@@ -64,13 +68,13 @@ export class ChatEventCollection {
           _id: result.insertedId, // Keep it as ObjectId
         };
       } else {
-        handleError(
+        this.handleError(
           'Failed to create message',
           HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
     } catch (error) {
-      handleError(
+      this.handleError(
         error.message || 'An error occurred while sending the message',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -132,6 +136,7 @@ export class ChatEventCollection {
         continue;
       }
 
+      // Check if the sender is viewing their own message
       if (message.sender._id.toString() === userId) {
         results.push({
           messageId: messageIdObject,
@@ -141,11 +146,10 @@ export class ChatEventCollection {
         continue;
       }
 
-      if (
-        message.readBy?.some((entry) =>
-          entry.userId.equals(dbUtils.convertToObjectId(userId)),
-        )
-      ) {
+      const userObjectId = dbUtils.convertToObjectId(userId);
+
+      // Check if the message has already been viewed by the user
+      if (message.readBy?.some((entry) => entry.userId.equals(userObjectId))) {
         results.push({
           messageId: messageIdObject,
           success: true,
@@ -154,22 +158,23 @@ export class ChatEventCollection {
         continue;
       }
 
-      if (!message.readBy) {
-        message.readBy = [];
-      }
-
+      // Create the new readBy entry
       const newReadByEntry: ReadByDto = {
-        userId: dbUtils.convertToObjectId(userId),
+        userId: userObjectId,
         type: 'viewer',
         timestamp: new Date().toISOString(),
       };
 
-      message.readBy.push(newReadByEntry);
+      // Use $addToSet to prevent duplicate entries
       await connectionDB.updateOne(
         { _id: messageIdObject },
-        { $set: { readBy: message.readBy, updatedAt: new Date() } },
+        {
+          $addToSet: { readBy: newReadByEntry },
+          $set: { updatedAt: new Date() },
+        },
       );
 
+      // Remove user from scheduler after viewing
       await removeUserFromScheduler(
         userId,
         messageIdObject.toString(),
@@ -187,16 +192,10 @@ export class ChatEventCollection {
     return results; // Return results for all message IDs
   }
 
-  async scheduler(messageData: CreateChatMessageDto, messageId: ObjectId) {
-    try {
-      await setScheduler(
-        messageData,
-        messageId,
-        this.databaseClientService,
-        this.scheduleUnreadMessagesCollection,
-      );
-    } catch (error) {
-      handleError('Error in scheduler function: ' + error.message);
-    }
+  private handleError(
+    message: string,
+    status: HttpStatus = HttpStatus.BAD_REQUEST,
+  ): never {
+    throw new HttpException(message, status);
   }
 }

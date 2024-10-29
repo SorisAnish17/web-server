@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb';
 import { getMessageById } from './get-chat-room-details';
 import { DatabaseClientService } from '../../../libs/database/index.service';
 import { dbCollectionNames } from 'src/libs/database/db-connections';
-import { getActiveUsersMap } from '../../chat/usecase/get-active-users-map';
+import { getActiveUsersMap } from './get-active-users-map';
 
 export const handleMerchant = async (
   messageId: ObjectId,
@@ -13,19 +13,21 @@ export const handleMerchant = async (
   try {
     const databaseClientService = new DatabaseClientService();
 
+    // Fetch the support ticket by chatRoomId
     const ticketDb = await databaseClientService.getDBCollection(
       dbCollectionNames.support_tickets,
     );
-
     const filterTicket = await ticketDb.findOne({
-      _id: chatRoomId,
+      _id: new ObjectId(chatRoomId),
     });
 
+    // Fetch message details
     const message = await getMessageById(messageId);
 
     // Fetch active users map
     const activeUsers = await getActiveUsersMap(databaseClientService);
 
+    // Check if assigned to merchant staff
     if (filterTicket?.assignedToMerchantStaff) {
       const assignedStaffId = filterTicket.assignedToMerchantStaff._id;
       const hasRead = message.readBy.some((reader) =>
@@ -34,16 +36,20 @@ export const handleMerchant = async (
 
       if (hasRead) {
         console.log(`Assigned merchant staff has read the message.`);
-        // Handle the case where the message has been read
       } else {
         console.log(`Assigned merchant staff has not read the message.`);
-        // Handle the case where the message has not been read
+        const user = activeUsers.get(organisationId.toString());
+        if (user) {
+          console.log(
+            `Socket ID for organisation ${organisationId}: ${user.socketId}`,
+          );
+          // Notify the organisation if needed
+        }
       }
     } else {
       const rolesCollection = await databaseClientService.getDBCollection(
         dbCollectionNames.merchants_roles_and_permissions,
       );
-
       const staffCollection = await databaseClientService.getDBCollection(
         dbCollectionNames.merchants_staff,
       );
@@ -69,20 +75,34 @@ export const handleMerchant = async (
 
       const roleBasedStaffIds = staffMembers.map((staff) => staff._id);
 
-      // Check if any role-based staff has read the message
-      const hasReadAnyRoleBasedStaff = message.readBy.some((reader) =>
-        roleBasedStaffIds.some((staffId) => reader.userId.equals(staffId)),
-      );
+      // Check which role-based staff have read the message
+      const staffReadStatus = roleBasedStaffIds.map((staffId) => ({
+        staffId,
+        hasRead: message.readBy.some((reader) => reader.userId.equals(staffId)),
+      }));
 
-      console.log('Role-based staff IDs:', roleBasedStaffIds);
+      // Filter staff who have not read the message
+      const staffNotRead = staffReadStatus.filter((staff) => !staff.hasRead);
 
-      if (hasReadAnyRoleBasedStaff) {
-        console.log(`At least one role-based staff has read the message.`);
-        console.log('Active users:', activeUsers);
-        // Handle the case where the message has been read
+      // Log and handle notifications for staff who have not read the message
+      if (staffNotRead.length > 0) {
+        console.log(
+          `Staff who have not read the message:`,
+          staffNotRead.map((staff) => staff.staffId),
+        );
+
+        // Retrieve socket IDs for those who have not read the message
+        staffNotRead.forEach(({ staffId }) => {
+          const user = activeUsers.get(staffId.toString());
+          if (user) {
+            console.log(`Socket ID for staff ${staffId}: ${user.socketId}`);
+            // Send notification to this staff using user.socketId
+          } else {
+            console.log(`Staff ${staffId} is not active.`);
+          }
+        });
       } else {
-        console.log(`No role-based staff has read the message.`);
-        // Handle the case where the message has not been read
+        console.log(`All role-based staff have read the message.`);
       }
 
       console.log(`No assigned merchant staff for chatRoomId: ${chatRoomId}`);

@@ -1,12 +1,12 @@
 import { dbUtils } from 'src/libs/database/utils';
 import { CreateChatMessageDto } from 'src/core/dto/chat-event';
 import { ObjectId } from 'mongodb';
-import { handleError } from '../../chat/usecase/handle-error';
 import { getChatRoomParticipate } from './chat-room-participate';
 import { DatabaseClientService } from '../../../libs/database/index.service';
 import { processCustomerNotification } from './process-customer-notification';
 import { processMerchantNotification } from './process-merchant-notification';
 import { ScheduleUnreadMessagesCollection } from '../../../libs/database/collections/schedule-unread-messages/schedule-unread-messages';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 export const setScheduler = async (
   messageData: CreateChatMessageDto,
@@ -63,6 +63,9 @@ export const setScheduler = async (
       console.log('No merchant found.');
     }
   } catch (error) {
-    handleError('Error in scheduler function: ' + error.message);
+    throw new HttpException(
+      'Error in scheduler function: ' + error.message,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 };

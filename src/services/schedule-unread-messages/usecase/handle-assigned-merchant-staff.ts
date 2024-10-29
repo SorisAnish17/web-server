@@ -1,6 +1,6 @@
 import { DatabaseClientService } from 'src/libs/database/index.service';
 import { dbUtils } from '../../../libs/database/utils';
-import { getMerchantStaffInfo } from '../../chat/usecase/get-merchant-staff-info';
+import { getMerchantStaffInfo } from './get-merchant-staff-info';
 import { checkMerchantNotificationPreference } from '../usecase/check-merchant-notification-preference';
 import { ScheduleUnreadMessagesCollection } from '../../../libs/database/collections/schedule-unread-messages/schedule-unread-messages';
 

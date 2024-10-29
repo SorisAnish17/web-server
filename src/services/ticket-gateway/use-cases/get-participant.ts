@@ -1,9 +1,10 @@
 import { Collection, ObjectId } from 'mongodb';
 import { dbCollectionNames } from '../../../libs/database/db-connections';
 import { DatabaseClientService } from '../../../libs/database/index.service';
-import { HttpStatus, HttpException } from '@nestjs/common';
+import { handleError } from './handle-error';
+import { HttpStatus } from '@nestjs/common';
 
-export async function fetchChatRoom(
+export async function getParticipants(
   databaseClientService: DatabaseClientService,
   chatRoomId: string,
 ): Promise<any> {
@@ -19,12 +20,5 @@ export async function fetchChatRoom(
     handleError('Chat room not found', HttpStatus.NOT_FOUND);
   }
 
-  return filterRoom;
-}
-
-function handleError(
-  message: string,
-  status: HttpStatus = HttpStatus.BAD_REQUEST,
-): never {
-  throw new HttpException(message, status);
+  return filterRoom.participants;
 }

@@ -1,17 +1,34 @@
-import { Module } from '@nestjs/common';
-import { TicketGatewayModule } from './services/ticket-gateway/ticket.gateway.module';
-import { OnlineActivityModule } from './services/online-activity/online-activity.module';
-import { ChatRoomsModule } from './services/chat-rooms/chat.rooms.module';
-import { ChatEventModule } from './services/chat/chat.module';
+import { Module, OnModuleInit } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { AppRoutesModule } from './app-routes.module';
+import { AgendaModule } from './services/agenda/agenda.module';
+import { EmailClientModule } from './libs/email-delivery-client/email-delivery.module';
+import { DatabaseClientModule } from './libs/database/index.module';
+import { AgendaProvider } from './services/agenda/agenda.controller';
+import { sendEmail } from './services/agenda/use-cases/send-email';
+import { removeEmailByEmail } from './services/agenda/use-cases/remove-email';
 
 @Module({
   imports: [
-    OnlineActivityModule,
-    ChatRoomsModule,
-    ChatEventModule,
-    TicketGatewayModule,
+    ConfigModule.forRoot({ envFilePath: `.env`, isGlobal: true }), // Make env initialization global
+    DatabaseClientModule,
+    EmailClientModule,
+    AgendaModule,
+    AppRoutesModule,
   ],
-  controllers: [],
-  providers: [],
+  providers: [AgendaProvider], // Ensure AgendaProvider is included here
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(private readonly agendaProvider: AgendaProvider) {}
+
+  async onModuleInit() {
+    this.agendaProvider.defineJob('send email', async (job) => {
+      const { emailDetails } = job.attrs.data;
+      await sendEmail(emailDetails);
+      await removeEmailByEmail(emailDetails.email);
+    });
+
+    // Start the Agenda jobs after defining them
+    await this.agendaProvider.start(); // Ensure you have a start method in your AgendaProvider
+  }
+}

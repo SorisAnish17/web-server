@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
-import { checkInternalAdminStaffs } from '../../chat/usecase/check-internal-admin-staff';
-import { processParticipants } from '../../chat/usecase/process-participants';
+import { checkInternalAdminStaffs } from './check-internal-admin-staff';
+import { processParticipants } from './process-participants';
 import { DatabaseClientService } from '../../../libs/database/index.service';
 import { handleError } from '../use-cases/handle-error';
 

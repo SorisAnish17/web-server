@@ -1,5 +1,5 @@
-import { getMerchantStaffInfo } from '../../chat/usecase/get-merchant-staff-info';
-import { checkMerchantRoleAndStatus } from '../../chat/usecase/check-merchant-role-status';
+import { getMerchantStaffInfo } from './get-merchant-staff-info';
+import { checkMerchantRoleAndStatus } from './check-merchant-role-status';
 import { DatabaseClientService } from 'src/libs/database/index.service';
 import { ScheduleUnreadMessagesCollection } from '../../../libs/database/collections/schedule-unread-messages/schedule-unread-messages';
 

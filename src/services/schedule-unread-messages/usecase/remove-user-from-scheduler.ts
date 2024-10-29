@@ -1,7 +1,7 @@
 import { DatabaseClientService } from '../../../libs/database/index.service';
 import { dbCollectionNames } from '../../../libs/database/db-connections';
 import { dbUtils } from '../../../libs/database/utils';
-import { AgendaProvider } from '../../../services/agenda/agenda.provider';
+import { AgendaProvider } from '../../agenda/agenda.controller';
 
 export const removeUserFromScheduler = async (
   userId: string,
